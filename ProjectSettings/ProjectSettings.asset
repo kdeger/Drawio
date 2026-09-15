@@ -154,7 +154,9 @@ PlayerSettings:
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
-    iOS: com.ConstantPouliquen.DrawIO
+    Android: com.kdeger.DrawIO
+    Standalone: com.kdeger.DrawIO
+    iPhone: com.kdeger.DrawIO
   buildNumber: {}
   AndroidBundleVersionCode: 1
   AndroidMinSdkVersion: 16

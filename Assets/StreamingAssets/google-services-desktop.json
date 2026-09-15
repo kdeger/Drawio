@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "949816252918",
+    "project_id": "drawio-4e44e",
+    "storage_bucket": "drawio-4e44e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:949816252918:android:f4d1d0cd16603937a8cfd7",
+        "android_client_info": {
+          "package_name": "com.kdeger.DrawIO"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPp0d45AwK7R7_pQIJ4vgVBTDcZvwsH7k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
