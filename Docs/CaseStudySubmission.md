@@ -277,7 +277,7 @@ A few requirements were open to interpretation, so these are the calls I made.
 
 I read "online support" as accounts, cloud save, remote configuration and experiments, analytics and server time, not real-time multiplayer. The opponents in the prototype are simulated locally, so netcode would be a separate project rather than a scaling step. I also kept the Unity version as provided. An engine upgrade would mix a migration into the findings, so I would treat it as its own task.
 
-Time spent: about N hours.
+Time spent: about 10 hours.
 
 ## Scope and limitations
 
