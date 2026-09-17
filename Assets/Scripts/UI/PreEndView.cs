@@ -43,7 +43,7 @@ public class PreEndView : View<PreEndView> {
     {
         base.Update();
 #if UNITY_EDITOR
-        if (Input.GetKeyDown(KeyCode.Alpha1))
+        if (Input.GetKeyDown(KeyCode.Alpha1) && m_GameManager.currentPhase == GamePhase.GAME)
             StartCoroutine(PreEndCoroutine());
 #endif
     }
