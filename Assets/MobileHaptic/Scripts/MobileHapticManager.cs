@@ -64,7 +64,7 @@ public class MobileHapticManager : MonoBehaviour {
 
 		//iOSHapticFeedback.Instance.Trigger
 #elif UNITY_ANDROID
-			AndroidVibration.Vibrate(androidForces[type]);
+			AndroidVibration.Vibrate(100);
 #endif
 
 
