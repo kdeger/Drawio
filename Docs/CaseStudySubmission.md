@@ -8,7 +8,7 @@ The document first looks at where the project is today, then where I would take 
 
 My goal would be to keep the gameplay intact while putting a clearer application structure around it. I would introduce those boundaries gradually so the game stays playable while the project moves toward a live product.
 
-Each section links to a short note with more detail. This document stays on the main problems, priorities and direction.
+Most sections link to a short note with more detail. This document stays on the main problems, priorities and direction.
 
 ## Current state of the project
 
@@ -68,17 +68,23 @@ Authentication sits between local player data and server synchronization, so it 
 
 A network failure should not keep the loading screen open forever. Local data is the fallback; remote calls have their own timeout/error result and unfinished work can retry later. If a newer profile or gameplay configuration arrives during a match, I would stage it and apply it at a safe boundary instead of changing active gameplay.
 
+The scene is not decoration. Without it the menu draws on the first frame from local data, and a server profile that arrives a second later changes the level and the name in front of the player. With it the menu is only shown once the profile is settled, and what the player sees first is already correct.
+
+The same initialization runs whether the Boot scene starts it or the game scene is opened directly, which keeps the editor workflow intact. The step is skipped when the services already exist, so the scene reload the game performs after every match does not re-run it.
+
 More detail: [Application Initialization](Systems/1_ApplicationInitialization.md).
 
 ## 2. Player data and persistence
 
 Gameplay and UI should work with one in-memory player model and should not care whether it came from a local file, migrated PlayerPrefs, or the server.
 
-The profile would contain versioning/sync information, settings, progression and customization data. Runtime Unity objects are not serialized.
+The profile would contain versioning/sync information, progression and customization data. Settings sit in their own file next to it, because they belong to the device rather than to the account. Runtime Unity objects are not serialized.
 
 Existing PlayerPrefs values can be imported once into the new format. For local storage I would keep the save path simple and safe: serialize a fixed snapshot, write it to a temporary file, and replace the primary save only after the write succeeds. A backup/recovery path is useful for interrupted writes.
 
 The save file is encrypted, but I would treat that only as light local protection, not as a trust or anti-cheat boundary.
+
+Having one model also answers what happens after a server profile is applied. Gameplay and UI read the profile through the same accessors they used for `PlayerPrefs`, so the values are correct as soon as the profile is replaced and nothing has to be invalidated. At startup the profile is settled before the menu is built, so there is nothing to refresh. Signing in or out later replaces it while the menu is already on screen, and the game reloads its scene for that, the same way it already does after a match. One rule covers every screen instead of a list of views to refresh by hand.
 
 More detail: [Player Data and Persistence](Systems/2_PlayerDataAndPersistence.md).
 
@@ -91,13 +97,15 @@ Signing in is a separate step, and I would keep two cases apart because they aff
 - **Link:** the current player connects an account. Progress stays the same and can now be restored on another device.
 - **Login:** the account already has a profile. There is now a local and a server profile, and the sync rules in section 4 decide which one is used.
 
-The difficult case is an account that already belongs to another profile. I would not choose automatically; the player picks between the current progress and the account's progress, and the other one is kept as a backup.
+The difficult case is an account that already belongs to another profile. In production I would not choose automatically; the player picks between the current progress and the account's progress, and the other one is kept as a backup. For the case I kept the simple rule: the local profile is backed up, the account's profile is applied when it is newer, otherwise the local one is kept and uploaded.
 
-I would start with Apple and Google, since they are native on each platform and do not need a separate account. Facebook and email can be added later behind the same interface. Gameplay and save code only see a player id, never the provider. If a token cannot be refreshed, the game continues with the local identity instead of blocking the player.
+For the case I implemented email sign-in through Firebase, because it can be tested in the Editor without a device or a store account. Apple and Google come next through the same interface, and they are the ones I would ship first on mobile since they are native on each platform. Gameplay and save code only see a player id, never the provider. If a token cannot be refreshed, or Firebase is not reachable at all, the game continues with the local identity instead of blocking the player.
 
 ## 4. Server data and synchronization
 
-The case doesn't need a real backend. I would put the client behind a small server interface and provide a deterministic decoy that can reproduce the cases I need to test: no server profile, same profile, newer profile, timeout and temporary failure.
+Authentication answers who the player is. This section answers what that player owns, and the two are deliberately separate. The provider stores an identity and nothing else: an id, the credential attached to it, and when it was last used. The profile lives behind the server interface instead, stored under that same id, so the game can change provider without moving its data and can change backend without touching sign-in.
+
+The case doesn't need a real backend. I would put the client behind a small server interface and provide a deterministic decoy that can reproduce the cases I need to test: no server profile, same profile, newer profile, timeout and temporary failure. In production the same interface points at the backend's own storage, one record per player.
 
 The decoy itself is simple. What matters are the decision rules:
 
@@ -108,7 +116,9 @@ The decoy itself is simple. What matters are the decision rules:
 - no server profile → continue locally
 - timeout/failure → continue with valid local data and retry later
 
-A lightweight metadata request can avoid downloading a large profile unnecessarily, but I would only keep that split if the real backend/profile size makes it worthwhile.
+The case implements the simple half of this against the decoy: no server profile or an older one means the local profile is uploaded, a newer one is applied after a local backup, and a failure or timeout keeps the local data. The dirty flag and the conflict branch are the production step.
+
+The revision call is also the existence check, so asking for it first and downloading only when the server is ahead costs no extra round trip.
 
 More detail: [Network Synchronization and Decoy Server](Systems/3_NetworkSynchronization.md).
 
@@ -206,7 +216,7 @@ This gives developers clearer boundaries without forcing the prototype into a la
 - Existing Unity/C# gameplay and uGUI for the baseline
 - ScriptableObjects for local defaults and content authoring
 - Versioned serializable player data with safe, encrypted local saves
-- Task-based initialization with explicit timeout/cancellation handling
+- Async initialization with an explicit timeout on every step, on plain `Task` here and on UniTask in a production project
 - Provider-independent adapters for authentication, remote config, server save and diagnostics
 - Deterministic decoy server for the assignment
 - Firebase Remote Config or equivalent behind the config interface
@@ -228,7 +238,7 @@ I would build it in this order. Each step only depends on the ones before it, an
 8. Add reviewer-selectable decoy scenarios so each server case can be reproduced on demand.
 9. Record build results, known limitations and actual time spent.
 
-Steps 1 to 5 cover the startup, save, account and server flow the case asks for. None of the steps require rewriting gameplay.
+Steps 1 to 5 cover the startup, save, account and server flow the case asks for, and step 8 came with them because the decoy is only useful if its cases can be switched on demand. None of them require rewriting gameplay.
 
 ## Production roadmap
 
@@ -253,6 +263,30 @@ Steps 1 to 5 cover the startup, save, account and server flow the case asks for.
 7. **Operate the live game**
    Profile on target devices, test save/schema migrations across released versions and keep server contracts backward-compatible.
 
+## Changes to the provided project
+
+The account slice is new code under `Assets/Scripts/Account`, so the game itself only changed where it had to read the new profile. Three scripts:
+
+- `StatsManager` now reads and writes the player profile instead of `PlayerPrefs`. Every method kept its name and signature, so the forty or so call sites around the game were left alone.
+- `SettingsPanel` takes vibration from the settings data and opens the account screen from its new button.
+- `PreEndView` had an editor shortcut on the `1` key that ended the round from anywhere. It now only fires during gameplay, because typing an email address into the account screen was triggering it.
+
+The scene and prefab changes are the account button in the settings panel with its neighbors moved down, the three settings animation clips re-keyed because the panel is taller and no longer hid fully at the old position, the bootstrap component on the `Managers` prefab, the account screen on its own overlay canvas, and `Boot` added to the build scenes.
+
+Opening the project in 2019.4.41f2 rather than the 2019.4.20f1 it was saved with also made Unity re-serialize the project settings and bump the embedded packages. None of that is my work, so it sits in its own commit.
+
+## Running it
+
+Open `Assets/Scenes/Boot.unity` and press play. The splash reports each step, then the menu opens. The account screen is behind the settings button in the top left.
+
+Everything that needs a switch is on `Assets/ScriptableObjects/SO_AccountSettings`:
+
+- `Scenario` picks what the decoy server answers: `NoData`, `HasData`, `Failure` or `Timeout`.
+- `UseMockAuthenticator` runs the whole flow without Firebase, against the account in `MockExistingEmail` and `MockExistingPassword`. The same provider takes over on its own when Firebase is missing, misconfigured or offline, so the game is never blocked by it.
+- Right-click the asset and choose `Reset Local Data` to test a fresh install.
+
+The console prefixes each area: `Boot`, `Auth`, `Sync` and `Decoy`.
+
 ## Validation
 
 The main scenarios I would cover are:
@@ -260,12 +294,16 @@ The main scenarios I would cover are:
 | Scenario | Expected result |
 | --- | --- |
 | Fresh install | A default player is created and saved before the menu |
+| Slow or unreachable server at startup | The splash ends on its own timeout and the menu opens with local data |
 | Returning player | Settings/progression/customization are restored |
 | Existing PlayerPrefs | Data is migrated once into the new profile |
+| Damaged save file | The last backup is restored, and only a missing backup falls back to a new player |
+| Sign out after signing in | The account's progression leaves the device and the pre-link backup comes back |
 | Guest player, never signs in | Everything works and progression is kept under the local id |
-| Credential already owns another profile | The player is asked, and the profile not chosen is kept as a backup |
+| Credential already owns another profile | The local profile is backed up, then the account's profile is applied when it is newer |
+| Sign in or out from the menu | The profile is saved and the scene is reloaded, so every screen shows the new player |
 | Offline or remote timeout | Valid local data is used and the game remains playable |
-| Newer server profile | It is validated and applied before the menu when possible |
+| Newer server profile | Progression and customization are applied before the menu is built; device settings are left alone |
 | Local + server both changed | Neither side is silently overwritten |
 | Invalid remote config | Last valid value or local default stays active |
 | Win/loss/revive flow | Flow completes or cancels without leaving gameplay/UI blocked |
@@ -277,11 +315,17 @@ A few requirements were open to interpretation, so these are the calls I made.
 
 I read "online support" as accounts, cloud save, remote configuration and experiments, analytics and server time, not real-time multiplayer. The opponents in the prototype are simulated locally, so netcode would be a separate project rather than a scaling step. I also kept the Unity version as provided. An engine upgrade would mix a migration into the findings, so I would treat it as its own task.
 
-Time spent: about 10 hours.
+The async code uses plain `Task`. In a production project I would use UniTask instead: it allocates nothing per await, it can await Unity's own operations such as a scene load or a frame directly, and it ties cancellation to the object's lifetime so a pending call stops when the object is destroyed. `Task` is perfectly fine at this scale, and I preferred not to pull in another dependency for a case that already adds the Firebase SDK.
+
+I first wired the initialization into the existing scene and only added the Boot scene afterwards. The order was already correct that way, but the menu was drawn before the server answered, so a returning player saw the old level for a moment and then watched it change. A startup sequence that is correct and still shows the wrong thing first is not finished, which is the argument for the extra scene.
+
+Time spent: about 22 hours.
 
 ## Scope and limitations
 
-The server used for the assignment is simulated. Local encryption only discourages casual editing; it is not a server trust boundary. Remote configuration can select or tune content already shipped in the client, but new assets still require a client update until remote content delivery is introduced.
+The server used for the assignment is simulated. Local encryption only discourages casual editing; it is not a server trust boundary. The key is a constant in the build, so anyone who unpacks the client can find it. Keeping it out of the client means deriving it per device, or keeping the values worth protecting on the server instead, and neither is worth doing while the server is a decoy. Remote configuration can select or tune content already shipped in the client, but new assets still require a client update until remote content delivery is introduced.
+
+I verified everything in the editor. An Android build on this engine version comes out 32 bit with the default scripting backend, so it does not install on a 64 bit device; that belongs with the engine upgrade rather than with this work.
 
 ## Conclusion
 
