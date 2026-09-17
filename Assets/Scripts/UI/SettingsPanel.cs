@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 
-public class SettingsPanel : MonoBehaviour 
+public class SettingsPanel : MonoBehaviour
 {
     public Image m_VibrationButton;
     public Sprite m_VibrationOnSprite;
@@ -23,14 +23,14 @@ public class SettingsPanel : MonoBehaviour
         set
         {
             MobileHapticManager.s_Vibrate = value;
-            PlayerPrefs.SetInt(Constants.c_VibrationSave, value ? 1 : 0); // Converting bool to int
+            PlayerSettingsProvider.Settings.Vibration = value;
         }
     }
 
     private void Awake()
     {
         m_Haptic = MobileHapticManager.Instance;
-        Vibration = PlayerPrefs.GetInt(Constants.c_VibrationSave, 1) == 1; // Converting int to bool
+        Vibration = PlayerSettingsProvider.Settings.Vibration;
 
         m_PanelVisible = false;
 
@@ -49,6 +49,15 @@ public class SettingsPanel : MonoBehaviour
     public void ClickSettingsButton()
     {
         m_PanelVisible = !m_PanelVisible;
+        m_BarAnim.SetBool("Visible", m_PanelVisible);
+    }
+
+    public void ClickAccountButton()
+    {
+        if (AccountView.Instance != null)
+            AccountView.Instance.Show();
+
+        m_PanelVisible = false;
         m_BarAnim.SetBool("Visible", m_PanelVisible);
     }
 

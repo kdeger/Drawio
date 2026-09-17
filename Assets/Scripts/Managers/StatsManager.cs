@@ -11,35 +11,32 @@ public class StatsManager : SingletonMB<StatsManager>
     {
         get
         {
-            return (PlayerPrefs.GetInt("FavoriteSkin", 0));
+            return (PlayerDataProvider.Model.Customization.SkinIndex);
         }
         set
         {
-            PlayerPrefs.SetInt("FavoriteSkin", value);
+            PlayerDataProvider.Model.Customization.SkinIndex = value;
         }
     }
 
     private int GetGameResult(int _Index)
 	{
-		string key = Constants.c_GameResultSave + "_" + _Index.ToString ();
+		List<int> results = PlayerDataProvider.Model.Progression.RecentResults;
 
-		if (PlayerPrefs.HasKey(key))
-			return PlayerPrefs.GetInt(key);
+		if (_Index >= 0 && _Index < results.Count)
+			return results[_Index];
 		else
 			return 0;
 	}
 
 	public void AddGameResult(int _WinScore)
 	{
-		// Move results
-		for (int i = Constants.c_SavedGameCount - 1; i >= 0; --i)
-		{
-			string key = Constants.c_GameResultSave + "_" + i.ToString ();
-			PlayerPrefs.SetInt (key, GetGameResult (i - 1));
-		}
+		List<int> results = PlayerDataProvider.Model.Progression.RecentResults;
 
-		// Set new result
-		PlayerPrefs.SetInt (Constants.c_GameResultSave + "_0", _WinScore);
+		results.Insert(0, _WinScore);
+
+		if (results.Count > Constants.c_SavedGameCount)
+			results.RemoveRange(Constants.c_SavedGameCount, results.Count - Constants.c_SavedGameCount);
 	}
 
 	public float GetLevel()
@@ -58,26 +55,24 @@ public class StatsManager : SingletonMB<StatsManager>
 		int score = GetBestScore ();
 		if (score < _Score)
 		{
-			PlayerPrefs.SetInt(Constants.c_BestScoreSave, _Score);
+			PlayerDataProvider.Model.Progression.BestScore = _Score;
 		}
 	}
 
 	public int GetBestScore()
 	{
-		if (PlayerPrefs.HasKey(Constants.c_BestScoreSave))
-			return PlayerPrefs.GetInt(Constants.c_BestScoreSave);
-		else
-			return 0;
+		return (PlayerDataProvider.Model.Progression.BestScore);
 	}
 
     public void SetNickname(string _Name)
 	{
-			PlayerPrefs.SetString(Constants.c_PlayerNameSave, _Name);
+			PlayerDataProvider.Model.Progression.Nickname = _Name;
 	}
 
     public string GetNickname()
 	{
-		return (PlayerPrefs.GetString(Constants.c_PlayerNameSave, null));
+		string nickname = PlayerDataProvider.Model.Progression.Nickname;
+		return (string.IsNullOrEmpty(nickname) ? null : nickname);
 	}
 
     public void SetLastXP(int _XP)
@@ -98,28 +93,28 @@ public class StatsManager : SingletonMB<StatsManager>
                 xp -= XPToNextLevel();
                 LevelUp();
             }
-            PlayerPrefs.SetInt(Constants.c_PlayerXPSave, xp);
+            PlayerDataProvider.Model.Progression.XP = xp;
 
 	}
-    
+
 	public int GetXP()
 	{
-		return (PlayerPrefs.GetInt(Constants.c_PlayerXPSave, 0));
+		return (PlayerDataProvider.Model.Progression.XP);
 	}
 
 	public int GetPlayerLevel()
 	{
-		return (PlayerPrefs.GetInt(Constants.c_PlayerLevelSave, 1));
+		return (PlayerDataProvider.Model.Progression.Level);
 	}
 
     void LevelUp()
 	{
-		PlayerPrefs.SetInt(Constants.c_PlayerLevelSave, GetPlayerLevel() + 1);
+		PlayerDataProvider.Model.Progression.Level = GetPlayerLevel() + 1;
 	}
 
     void LevelDown()
     {
-        PlayerPrefs.SetInt(Constants.c_PlayerLevelSave, GetPlayerLevel() - 1);
+        PlayerDataProvider.Model.Progression.Level = GetPlayerLevel() - 1;
     }
 
 	public int XPToNextLevel(int _LevelStart = -1)
